@@ -9,7 +9,9 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.lang.System;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.Arrays;
 import java.io.BufferedReader;
 import java.util.spi.ResourceBundleControlProvider;
@@ -17,32 +19,30 @@ import java.util.spi.ResourceBundleControlProvider;
 //
 // This is an implementation of a simplified version of a command
 // line dictionary client. The only argument the program takes is
-// -d which turns on debugging output. 
+// -d which turns on debugging output.
 //
 
 
 public class CSdict {
     static final int MAX_LEN = 255;
     static Boolean debugOn = false;
-    
     private static final int PERMITTED_ARGUMENT_COUNT = 1;
     private static String command;
     private static String[] arguments;
-
     private static Socket socket;
     private static PrintWriter out;
     private static BufferedReader in;
     private static BufferedReader stdIn;
-
     private static String dictionary;
+    private static boolean isConnectionOpen = false;
 
 
     public static void main(String [] args) {
-        byte cmdString[] = new byte[MAX_LEN];
-	    int len;
+        byte cmdString[];
+        int len;
 
-	// Verify command line arguments
-	
+        // Verify command line arguments
+
         if (args.length == PERMITTED_ARGUMENT_COUNT) {
             debugOn = args[0].equals("-d");
             if (debugOn) {
@@ -57,93 +57,159 @@ public class CSdict {
         }
 
 
-	// Example code to read command line input and extract arguments.
+        // Example code to read command line input and extract arguments.
 
-        try {
-            System.out.print("csdict> ");
-            System.in.read(cmdString);
+        // Quit flag to exit loop
+        Boolean quitFlag = false;
 
-            // Convert the command string to ASII
-            String inputString = new String(cmdString, "ASCII");
-
-            // Split the string into words
-            String[] inputs = inputString.trim().split("( |\t)+");
-            // Set the command
-            command = inputs[0].toLowerCase().trim();
-            // Remainder of the inputs is the arguments.
-            arguments = Arrays.copyOfRange(inputs, 1, inputs.length);
-
-            System.out.println("The command is: " + command);
-            len = arguments.length;
-            System.out.println("The arguments are: ");
-            for (int i = 0; i < len; i++) {
-                System.out.println("    " + arguments[i]);
-            }
-
-            while (!command.equals("quit")) {
-                switch (command) {
-                    case "open":
-                        openConnection(arguments[0], Integer.parseInt(arguments[1]));
-                        break;
-                    case "dict":
-                        printDictionaries();
-                        break;
-                    case "set":
-                        setDictionary(arguments[0]);
-                        break;
-                    case "define":
-                        defineWord(arguments[0]);
-                        break;
-                    case "match":
-                        match(dictionary, "exact", arguments[0]);
-                        break;
-                    case "quit":
-                        return;
-                    default:
-                        System.out.println("invalid command");
-                        break;
-                }
-                System.out.print("csdict> ");
+        do {
+            try {
                 cmdString = new byte[MAX_LEN];
+                System.out.print("csdict> ");
                 System.in.read(cmdString);
 
                 // Convert the command string to ASII
-                inputString = new String(cmdString, "ASCII");
+                String inputString = new String(cmdString, "ASCII");
 
                 // Split the string into words
-                inputs = inputString.trim().split("( |\t)+");
+                String[] inputs = inputString.trim().split("( |\t)+");
                 // Set the command
                 command = inputs[0].toLowerCase().trim();
                 // Remainder of the inputs is the arguments.
                 arguments = Arrays.copyOfRange(inputs, 1, inputs.length);
-
-                System.out.println("The command is: " + command);
                 len = arguments.length;
-                System.out.println("The arguments are: ");
-                for (int i = 0; i < len; i++) {
-                    System.out.println("    " + arguments[i]);
+
+//                System.out.println("The command is: " + command);
+//                System.out.println("The arguments are: ");
+//                for (int i = 0; i < len; i++) {
+//                    System.out.println("    " + arguments[i]);
+//                }
+
+                // Flags for errors
+                Boolean hasaNumber = false;
+
+                switch (command) {
+                    case "open":
+                        if (len != 2) {
+                            throw new ClientError("901 Incorrect number of arguments.");
+                        }
+                        try {
+                            Integer.parseInt(arguments[1]);
+                        } catch (NumberFormatException e) {
+                            throw new ClientError("902 Invalid argument.");
+                        }
+                        openConnection(arguments[0], Integer.parseInt(arguments[1]));
+                        break;
+                    case "dict":
+                        if (!isConnectionOpen) {
+                            throw new ClientError("903 Supplied command not expected at this time");
+                        }
+                        if (len != 0) {
+                            throw new ClientError("901 Incorrect number of arguments.");
+                        }
+                        printDictionaries();
+                        break;
+                    case "set":
+                        if (!isConnectionOpen) {
+                            throw new ClientError("903 Supplied command not expected at this time");
+                        }
+                        if (len != 1) {
+                            throw new ClientError("901 Incorrect number of arguments.");
+                        }
+                        setDictionary(arguments[0]);
+                        break;
+                    case "define":
+                        if (!isConnectionOpen) {
+                            throw new ClientError("903 Supplied command not expected at this time");
+                        }
+                        if (len != 1) {
+                            throw new ClientError("901 Incorrect number of arguments.");
+                        }
+                        hasaNumber = arguments[0].matches(".*\\d.*");
+                        if (hasaNumber == true) {
+                            throw new ClientError("902 Invalid argument");
+                        }
+                        defineWord(arguments[0]);
+                        break;
+                    case "match":
+                        if (!isConnectionOpen) {
+                            throw new ClientError("903 Supplied command not expected at this time");
+                        }
+                        if (len != 1) {
+                            throw new ClientError("901 Incorrect number of arguments.");
+                        }
+                        hasaNumber = arguments[0].matches(".*\\d.*");
+                        if (hasaNumber == true) {
+                            throw new ClientError("902 Invalid argument");
+                        }
+                        match(dictionary, "exact", arguments[0], false);
+                        break;
+                    case "prefixmatch":
+                        if (!isConnectionOpen) {
+                            throw new ClientError("903 Supplied command not expected at this time");
+                        }
+                        if (len != 1) {
+                            throw new ClientError("901 Incorrect number of arguments.");
+                        }
+                        if (hasaNumber == true) {
+                            throw new ClientError("902 Invalid argument");
+                        }
+                        match(dictionary, "prefix", arguments[0], false);
+                        break;
+                    case "close":
+                        if (!isConnectionOpen) {
+                            throw new ClientError("903 Supplied command not expected at this time");
+                        }
+                        if (len != 0) {
+                            throw new ClientError("901 Incorrect number of arguments.");
+                        }
+                        break;
+                    case "quit":
+                        if (len != 0) {
+                            throw new ClientError("901 Incorrect number of arguments.");
+                        } else {
+                            quitFlag = true;
+                        }
+                        break;
+                    default:
+                        throw new ClientError("900 Invalid command.");
                 }
+
+            } catch (IOException exception) {
+                System.out.println("998 Input error while reading commands, terminating.");
+                System.exit(-1);
             }
-
-	    System.out.println("Done.");
-
-        } catch (IOException exception) {
-            System.err.println("998 Input error while reading commands, terminating.");
-            System.exit(-1);
-        }
+            catch (ClientError e) {
+                System.out.println(e.getMessage());
+            }
+        } while (quitFlag == false);
     }
 
     private static void openConnection(String hostname, int port) throws IOException {
         try {
-            socket = new Socket(hostname, port);
+            // will either need to make this a TimeLimitedCodeBlock or maybe a Future or something
+
+
+            socket = new Socket();
+            socket.connect(new InetSocketAddress(hostname, port), 4 * 1000);
+            socket.setSoTimeout(3*1000);
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             stdIn = new BufferedReader(new InputStreamReader(System.in));
             dictionary = "*";
             String detailedStatusInfo = in.readLine();
             System.out.println(detailedStatusInfo);
+            isConnectionOpen = true;
+        }
+        catch (SocketTimeoutException e) {
+            if (e.toString().indexOf("Connect") != -1) {
+                System.out.printf("920 Control connection to %s on port %s failed to open.\n", hostname, port);
+            } else {
+                System.out.println("999 Processing error. Timed out while waiting for a response.");
+            }
         }
         catch (Exception e) {
+
             System.out.println("error occurred during connection");
         }
     }
@@ -180,23 +246,36 @@ public class CSdict {
             in.readLine();
         } else if (response.getStatusCode() == response.NO_MATCH) {
             System.out.println("****No definition found****");
-            match(dictionary, ".", word);
+            match(dictionary, ".", word, true);
 
         }
     }
 
-    private static void match(String dictionary, String strategy, String word) throws IOException {
+    private static void match(String dictionary, String strategy, String word, boolean isDefineFlag) throws IOException {
         out.printf("MATCH %s %s %s\r\n", dictionary, strategy, word);
         Response response = new Response(in);
+        String detailedStatusInfo;
         if (response.getStatusCode() == response.MATCH_FOUND) {
             String output;
             while (!(output = in.readLine()).equals(".")) {
                 System.out.println(output);
             }
-            String detailedStatusInfo = in.readLine();
+            detailedStatusInfo = in.readLine();
+        } else if (response.getStatusCode() == response.NO_MATCH) {
+            if (!isDefineFlag) {
+                System.out.println("****No matching word(s) found****");
+            } else {
+                System.out.println("****No matches found****");
+            }
         }
+    }
 
-
+    private static void close() throws IOException {
+        out.printf("quit\r\n");
+        Response response = new Response(in);
+        if (response.getStatusCode() == response.SUCCESSFUL_CLOSE) {
+            System.out.println("successfully closed");
+        }
     }
 }
     

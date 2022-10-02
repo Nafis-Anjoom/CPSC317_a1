@@ -8,7 +8,7 @@ public class Response {
     public static final int MATCH_FOUND = 152;
     public static final int DICTIONARY_INFO = 151;
     public static final int OK = 250;
-
+    public static final int SUCCESSFUL_CLOSE = 221;
     private int statusCode;
     private int numOfMatches = -1;
 
