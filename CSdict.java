@@ -9,6 +9,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.lang.System;
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
@@ -92,16 +93,11 @@ public class CSdict {
                         if (len != 2) {
                             throw new ClientError("901 Incorrect number of arguments.");
                         }
-                        try {
-                            Integer.parseInt(arguments[1]);
-                        } catch (NumberFormatException e) {
-                            throw new ClientError("902 Invalid argument.");
-                        }
                         openConnection(arguments[0], Integer.parseInt(arguments[1]));
                         break;
                     case "dict":
                         if (!isConnectionOpen) {
-                            throw new ClientError("903 Supplied command not expected at this time");
+                            throw new ClientError("903 Supplied command not expected at this time.");
                         }
                         if (len != 0) {
                             throw new ClientError("901 Incorrect number of arguments.");
@@ -110,7 +106,7 @@ public class CSdict {
                         break;
                     case "set":
                         if (!isConnectionOpen) {
-                            throw new ClientError("903 Supplied command not expected at this time");
+                            throw new ClientError("903 Supplied command not expected at this time.");
                         }
                         if (len != 1) {
                             throw new ClientError("901 Incorrect number of arguments.");
@@ -128,7 +124,7 @@ public class CSdict {
                         break;
                     case "match":
                         if (!isConnectionOpen) {
-                            throw new ClientError("903 Supplied command not expected at this time");
+                            throw new ClientError("903 Supplied command not expected at this time.");
                         }
                         if (len != 1) {
                             throw new ClientError("901 Incorrect number of arguments.");
@@ -137,7 +133,7 @@ public class CSdict {
                         break;
                     case "prefixmatch":
                         if (!isConnectionOpen) {
-                            throw new ClientError("903 Supplied command not expected at this time");
+                            throw new ClientError("903 Supplied command not expected at this time.");
                         }
                         if (len != 1) {
                             throw new ClientError("901 Incorrect number of arguments.");
@@ -146,7 +142,7 @@ public class CSdict {
                         break;
                     case "close":
                         if (!isConnectionOpen) {
-                            throw new ClientError("903 Supplied command not expected at this time");
+                            throw new ClientError("903 Supplied command not expected at this time.");
                         }
                         if (len != 0) {
                             throw new ClientError("901 Incorrect number of arguments.");
@@ -157,6 +153,9 @@ public class CSdict {
                         if (len != 0) {
                             throw new ClientError("901 Incorrect number of arguments.");
                         } else {
+                            if (isConnectionOpen) {
+                                close();
+                            }
                             quitFlag = true;
                         }
                         break;
@@ -164,9 +163,12 @@ public class CSdict {
                         throw new ClientError("900 Invalid command.");
                 }
 
-            } catch (IOException exception) {
+            } catch (IOException e) {
                 System.out.println("998 Input error while reading commands, terminating.");
                 System.exit(-1);
+            }
+            catch (NumberFormatException e) {
+                System.out.println("902 Invalid argument.");
             }
             catch (ClientError e) {
                 System.out.println(e.getMessage());
@@ -174,11 +176,9 @@ public class CSdict {
         } while (quitFlag == false);
     }
 
-    private static void openConnection(String hostname, int port) throws IOException {
+    private static void openConnection(String hostname, int port) {
         try {
             // will either need to make this a TimeLimitedCodeBlock or maybe a Future or something
-
-
             socket = new Socket();
             socket.connect(new InetSocketAddress(hostname, port), 30 * 1000);
             socket.setSoTimeout(30*1000);
@@ -192,15 +192,14 @@ public class CSdict {
             }
             isConnectionOpen = true;
         }
+        catch (ConnectException e) {
+            System.out.printf("920 Control connection to %s on port %s failed to open.\n", hostname, port);
+        }
         catch (SocketTimeoutException e) {
-            if (e.toString().indexOf("Connect") != -1) {
-                System.out.printf("920 Control connection to %s on port %s failed to open.\n", hostname, port);
-            } else {
-                System.out.println("999 Processing error. Timed out while waiting for a response.");
-            }
+            System.out.println("999 Processing error. Timed out while waiting for a response.");
         }
         catch (Exception e) {
-            System.out.println("error occurred during connection");
+            System.out.println("999 Processing error. " + e.getMessage());
         }
     }
 
@@ -208,88 +207,114 @@ public class CSdict {
         dictionary = name;
     }
 
-    private static void printDictionaries() throws IOException {
-        String command = "SHOW DB\r\n";
-        if (debugOn) {
-            System.out.print("> " + command);
-        }
-        out.print(command);
-        out.flush();
-        String response = in.readLine();
-        while (!response.equals(".")) {
-            System.out.println(response);
-            response = in.readLine();
-        }
-        System.out.println(".");
-        String detailedStatusInfo = in.readLine();
-        if (debugOn) {
-            System.out.println("<-- " + detailedStatusInfo);
-        }
-    }
-
-    private static void defineWord(String word) throws IOException {
-        String command = String.format("DEFINE %s %s\r\n", dictionary, word);
-        if (debugOn) {
-            System.out.print("> " + command);
-        }
-        out.printf(command);
-        Response response = new Response(in);
-
-        if (response.getStatusCode() == response.SUCCESSFUL_RETRIEVAL) {
-            int numOfDefinitions = response.getNumOfMatches();
-            for (int i = 0; i < numOfDefinitions; i++) {
-                Definition definition = new Definition(in);
-                System.out.println(definition.getDatabaseInfo());
-                System.out.println(definition.getDefinition());
-                System.out.println(".");
-            }
-            in.readLine();
-        } else if (response.getStatusCode() == response.NO_MATCH) {
-            System.out.println("****No definition found****");
-            match(dictionary, ".", word, true);
-
-        }
-    }
-
-    private static void match(String dictionary, String strategy, String word, boolean isDefineFlag) throws IOException {
-        String command = String.format("MATCH %s %s %s\r\n", dictionary, strategy, word);
-        if (debugOn) {
-            System.out.print("> " + command);
-        }
-        out.printf(command);
-        Response response = new Response(in);
-        String detailedStatusInfo;
-        if (response.getStatusCode() == response.MATCH_FOUND) {
-            String output;
-            while (!(output = in.readLine()).equals(".")) {
-                System.out.println(output);
+    private static void printDictionaries() {
+        try {
+            String command = "SHOW DB\r\n";
+            writeToSocket(command);
+            String response = in.readLine();
+            while (!response.equals(".")) {
+                System.out.println(response);
+                response = in.readLine();
             }
             System.out.println(".");
-            detailedStatusInfo = in.readLine();
+            String detailedStatusInfo = in.readLine();
             if (debugOn) {
                 System.out.println("<-- " + detailedStatusInfo);
             }
-        } else if (response.getStatusCode() == response.NO_MATCH) {
-            if (!isDefineFlag) {
-                System.out.println("****No matching word(s) found****");
-            } else {
-                System.out.println("****No matches found****");
+        }
+        catch (Exception e) {
+            System.out.println("999 Processing error. " + e.toString());
+        }
+
+    }
+
+    private static void defineWord(String word) {
+        try {
+            String command = String.format("DEFINE %s %s\r\n", dictionary, word);
+            writeToSocket(command);
+            Response response = new Response(in);
+
+            if (response.getStatusCode() == response.SUCCESSFUL_RETRIEVAL) {
+                int numOfDefinitions = response.getNumOfMatches();
+                for (int i = 0; i < numOfDefinitions; i++) {
+                    Definition definition = new Definition(in);
+                    System.out.println(definition.getDatabaseInfo());
+                    System.out.println(definition.getDefinition());
+                    System.out.println(".");
+                }
+                in.readLine();
             }
+            else if (response.getStatusCode() == response.NO_MATCH) {
+                System.out.println("****No definition found****");
+                match(dictionary, ".", word, true);
+            }
+            else if (response.getStatusCode() == response.INVALID_DATABASE) {
+                System.out.println("999 Processing error. Invalid database");
+            }
+            else {
+                System.out.println("999 Processor error.");
+            }
+        } catch (Exception e) {
+            System.out.println("999 Processing error. " + e.getMessage());
         }
     }
 
-    private static void close() throws IOException {
-        String command = "quit\r\n";
+    private static void match(String dictionary, String strategy, String word, boolean isDefineFlag) {
+        try {
+            String command = String.format("MATCH %s %s %s\r\n", dictionary, strategy, word);
+            writeToSocket(command);
+            Response response = new Response(in);
+            String detailedStatusInfo;
+            if (response.getStatusCode() == response.MATCH_FOUND) {
+                String output;
+                while (!(output = in.readLine()).equals(".")) {
+                    System.out.println(output);
+                }
+                System.out.println(".");
+                detailedStatusInfo = in.readLine();
+                if (debugOn) {
+                    System.out.println("<-- " + detailedStatusInfo);
+                }
+            }
+            else if (response.getStatusCode() == response.NO_MATCH) {
+                if (!isDefineFlag) {
+                    System.out.println("****No matching word(s) found****");
+                } else {
+                    System.out.println("****No matches found****");
+                }
+            }
+            else if (response.getStatusCode() == response.INVALID_DATABASE) {
+                System.out.println("999 Processing error. Invalid database");
+            }
+            else {
+                System.out.println("99 Processing error.");
+            }
+        } catch (Exception e) {
+            System.out.println("99 Processing error.");
+        }
+    }
+
+    private static void close() {
+        try {
+            String command = "QUIT\r\n";
+            writeToSocket(command);
+            Response response = new Response(in);
+            if (response.getStatusCode() == response.SUCCESSFUL_CLOSE) {
+                isConnectionOpen = false;
+            } else {
+                System.out.println("999 Processing error. Could not close connection.");
+            }
+        }
+        catch (Exception e) {
+            System.out.println("999 Processing error. " + e.getMessage());
+        }
+    }
+
+    private static void writeToSocket(String command) {
         if (debugOn) {
             System.out.print("> " + command);
         }
         out.printf(command);
-        Response response = new Response(in);
-        if (response.getStatusCode() == response.SUCCESSFUL_CLOSE) {
-            isConnectionOpen = false;
-        } else {
-            throw new ClientError("999 Processing error. Could not close connection.");
-        }
     }
 }
     

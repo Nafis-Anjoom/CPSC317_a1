@@ -21,7 +21,7 @@ public class Response {
         }
         String[] codes = initialResponse.split(" ");
         statusCode = Integer.parseInt(codes[0]);
-        if (statusCode == SUCCESSFUL_RETRIEVAL || statusCode == MATCH_FOUND || statusCode == 152) {
+        if (statusCode == SUCCESSFUL_RETRIEVAL || statusCode == MATCH_FOUND) {
             numOfMatches = Integer.parseInt(codes[1]);
         }
     }
