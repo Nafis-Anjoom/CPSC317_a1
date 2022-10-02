@@ -85,9 +85,8 @@ public class CSdict {
 //                    System.out.println("    " + arguments[i]);
 //                }
 
-                // Flags for errors
-                Boolean hasaNumber = false;
-
+                if (command.equals("") || command.charAt(0) == '#')
+                    continue;
                 switch (command) {
                     case "open":
                         if (len != 2) {
@@ -125,10 +124,6 @@ public class CSdict {
                         if (len != 1) {
                             throw new ClientError("901 Incorrect number of arguments.");
                         }
-                        hasaNumber = arguments[0].matches(".*\\d.*");
-                        if (hasaNumber == true) {
-                            throw new ClientError("902 Invalid argument");
-                        }
                         defineWord(arguments[0]);
                         break;
                     case "match":
@@ -138,10 +133,6 @@ public class CSdict {
                         if (len != 1) {
                             throw new ClientError("901 Incorrect number of arguments.");
                         }
-                        hasaNumber = arguments[0].matches(".*\\d.*");
-                        if (hasaNumber == true) {
-                            throw new ClientError("902 Invalid argument");
-                        }
                         match(dictionary, "exact", arguments[0], false);
                         break;
                     case "prefixmatch":
@@ -150,9 +141,6 @@ public class CSdict {
                         }
                         if (len != 1) {
                             throw new ClientError("901 Incorrect number of arguments.");
-                        }
-                        if (hasaNumber == true) {
-                            throw new ClientError("902 Invalid argument");
                         }
                         match(dictionary, "prefix", arguments[0], false);
                         break;
@@ -192,14 +180,16 @@ public class CSdict {
 
 
             socket = new Socket();
-            socket.connect(new InetSocketAddress(hostname, port), 4 * 1000);
-            socket.setSoTimeout(3*1000);
+            socket.connect(new InetSocketAddress(hostname, port), 30 * 1000);
+            socket.setSoTimeout(30*1000);
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             stdIn = new BufferedReader(new InputStreamReader(System.in));
             dictionary = "*";
             String detailedStatusInfo = in.readLine();
-            System.out.println(detailedStatusInfo);
+            if (debugOn) {
+                System.out.println("<-- " + detailedStatusInfo);
+            }
             isConnectionOpen = true;
         }
         catch (SocketTimeoutException e) {
@@ -210,7 +200,6 @@ public class CSdict {
             }
         }
         catch (Exception e) {
-
             System.out.println("error occurred during connection");
         }
     }
@@ -220,9 +209,12 @@ public class CSdict {
     }
 
     private static void printDictionaries() throws IOException {
-        out.print("SHOW DB\r\n");
+        String command = "SHOW DB\r\n";
+        if (debugOn) {
+            System.out.print("> " + command);
+        }
+        out.print(command);
         out.flush();
-        System.out.println("> SHOW DB");
         String response = in.readLine();
         while (!response.equals(".")) {
             System.out.println(response);
@@ -230,10 +222,17 @@ public class CSdict {
         }
         System.out.println(".");
         String detailedStatusInfo = in.readLine();
+        if (debugOn) {
+            System.out.println("<-- " + detailedStatusInfo);
+        }
     }
 
     private static void defineWord(String word) throws IOException {
-        out.printf("DEFINE %s %s\r\n", dictionary, word);
+        String command = String.format("DEFINE %s %s\r\n", dictionary, word);
+        if (debugOn) {
+            System.out.print("> " + command);
+        }
+        out.printf(command);
         Response response = new Response(in);
 
         if (response.getStatusCode() == response.SUCCESSFUL_RETRIEVAL) {
@@ -253,7 +252,11 @@ public class CSdict {
     }
 
     private static void match(String dictionary, String strategy, String word, boolean isDefineFlag) throws IOException {
-        out.printf("MATCH %s %s %s\r\n", dictionary, strategy, word);
+        String command = String.format("MATCH %s %s %s\r\n", dictionary, strategy, word);
+        if (debugOn) {
+            System.out.print("> " + command);
+        }
+        out.printf(command);
         Response response = new Response(in);
         String detailedStatusInfo;
         if (response.getStatusCode() == response.MATCH_FOUND) {
@@ -261,7 +264,11 @@ public class CSdict {
             while (!(output = in.readLine()).equals(".")) {
                 System.out.println(output);
             }
+            System.out.println(".");
             detailedStatusInfo = in.readLine();
+            if (debugOn) {
+                System.out.println("<-- " + detailedStatusInfo);
+            }
         } else if (response.getStatusCode() == response.NO_MATCH) {
             if (!isDefineFlag) {
                 System.out.println("****No matching word(s) found****");
@@ -272,15 +279,17 @@ public class CSdict {
     }
 
     private static void close() throws IOException {
-        out.printf("quit\r\n");
+        String command = "quit\r\n";
+        if (debugOn) {
+            System.out.print("> " + command);
+        }
+        out.printf(command);
         Response response = new Response(in);
         if (response.getStatusCode() == response.SUCCESSFUL_CLOSE) {
-            System.out.println("successfully closed");
             isConnectionOpen = false;
         } else {
-            System.out.println("Error closing connection");
+            throw new ClientError("999 Processing error. Could not close connection.");
         }
-
     }
 }
     

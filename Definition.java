@@ -10,6 +10,9 @@ public class Definition {
 
     public Definition(BufferedReader in) throws IOException {
         String databaseInfo = in.readLine();
+        if (CSdict.debugOn) {
+            System.out.println("<-- " + databaseInfo);
+        }
         Pattern p = Pattern.compile("\"([^\"]*)\"");
         Matcher m = p.matcher(databaseInfo);
 
@@ -19,9 +22,9 @@ public class Definition {
         }
 
         String input;
-        definition += in.readLine();
+        definition += in.readLine().trim();
         while(!(input = in.readLine()).equals(".")) {
-            definition += "\n" + input;
+            definition += "\n" + input.trim();
         }
     }
 

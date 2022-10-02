@@ -16,6 +16,9 @@ public class Response {
 
     public Response(BufferedReader in) throws IOException {
         String initialResponse = in.readLine();
+        if (CSdict.debugOn) {
+            System.out.println("<-- " + initialResponse);
+        }
         String[] codes = initialResponse.split(" ");
         statusCode = Integer.parseInt(codes[0]);
         if (statusCode == SUCCESSFUL_RETRIEVAL || statusCode == MATCH_FOUND || statusCode == 152) {
