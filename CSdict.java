@@ -163,6 +163,7 @@ public class CSdict {
                         if (len != 0) {
                             throw new ClientError("901 Incorrect number of arguments.");
                         }
+                        close();
                         break;
                     case "quit":
                         if (len != 0) {
@@ -275,7 +276,11 @@ public class CSdict {
         Response response = new Response(in);
         if (response.getStatusCode() == response.SUCCESSFUL_CLOSE) {
             System.out.println("successfully closed");
+            isConnectionOpen = false;
+        } else {
+            System.out.println("Error closing connection");
         }
+
     }
 }
     
