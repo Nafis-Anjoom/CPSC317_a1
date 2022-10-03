@@ -28,10 +28,10 @@ information to this file and then commit and push this file.
 
 
 STUDENT  1
-Name :
-St. No:
-Unix Id :
-Email:
+Name : Nafis Anjoom
+St. No: 19212794
+Unix Id : nanjoom
+Email: nanjoom@students.cs.ubc.ca
 
 
 STUDENT  2

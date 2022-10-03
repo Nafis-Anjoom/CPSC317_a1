@@ -9,12 +9,11 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.lang.System;
 import java.io.IOException;
-import java.net.ConnectException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
+import java.net.*;
 import java.util.Arrays;
 import java.io.BufferedReader;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.spi.ResourceBundleControlProvider;
 
 //
@@ -36,6 +35,8 @@ public class CSdict {
     private static BufferedReader stdIn;
     private static String dictionary;
     private static boolean isConnectionOpen = false;
+    private static final int CONNECTION_TIMEOUT = 30 * 1000;
+    private static final int RESPONSE_TIMEOUT = 30 * 1000;
 
 
     public static void main(String [] args) {
@@ -180,8 +181,8 @@ public class CSdict {
         try {
             // will either need to make this a TimeLimitedCodeBlock or maybe a Future or something
             socket = new Socket();
-            socket.connect(new InetSocketAddress(hostname, port), 30 * 1000);
-            socket.setSoTimeout(30*1000);
+            socket.connect(new InetSocketAddress(hostname, port), CONNECTION_TIMEOUT);
+            socket.setSoTimeout(RESPONSE_TIMEOUT);
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             stdIn = new BufferedReader(new InputStreamReader(System.in));
