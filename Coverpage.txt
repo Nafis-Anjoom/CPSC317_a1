@@ -35,8 +35,11 @@ Email: nanjoom@students.cs.ubc.ca
 
 
 STUDENT  2
-Name :
-St. No:
-Unix Id :
-Email:
+Name : Scott Banducci
+St. No: 80557069
+Unix Id : banducci
+Email: scott.banducci@gmail.com
+
+
+
 

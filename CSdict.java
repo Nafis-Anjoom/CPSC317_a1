@@ -199,8 +199,12 @@ public class CSdict {
         catch (SocketTimeoutException e) {
             System.out.println("999 Processing error. Timed out while waiting for a response.");
         }
+        catch (SocketException e) {
+            isConnectionOpen = false;
+            System.out.println("925 Control connection I/O error, closing control connection.");
+        }
         catch (Exception e) {
-            System.out.println("999 Processing error. " + e.getMessage());
+            System.out.println("999 Processing error. Unable to create connection.");
         }
     }
 
@@ -223,8 +227,12 @@ public class CSdict {
                 System.out.println("<-- " + detailedStatusInfo);
             }
         }
+        catch (SocketException e) {
+            isConnectionOpen = false;
+            System.out.println("925 Control connection I/O error, closing control connection.");
+        }
         catch (Exception e) {
-            System.out.println("999 Processing error. " + e.toString());
+            System.out.println("999 Processing error. Error Printing dictionaries.");
         }
 
     }
@@ -234,6 +242,7 @@ public class CSdict {
             String command = String.format("DEFINE %s %s\r\n", dictionary, word);
             writeToSocket(command);
             Response response = new Response(in);
+            String detailedStatusInfo;
 
             if (response.getStatusCode() == response.SUCCESSFUL_RETRIEVAL) {
                 int numOfDefinitions = response.getNumOfMatches();
@@ -243,7 +252,10 @@ public class CSdict {
                     System.out.println(definition.getDefinition());
                     System.out.println(".");
                 }
-                in.readLine();
+                detailedStatusInfo = in.readLine();
+                if (debugOn) {
+                    System.out.println("<-- " + detailedStatusInfo);
+                }
             }
             else if (response.getStatusCode() == response.NO_MATCH) {
                 System.out.println("****No definition found****");
@@ -255,8 +267,13 @@ public class CSdict {
             else {
                 System.out.println("999 Processor error.");
             }
-        } catch (Exception e) {
-            System.out.println("999 Processing error. " + e.getMessage());
+        }
+        catch (SocketException e) {
+            isConnectionOpen = false;
+            System.out.println("925 Control connection I/O error, closing control connection.");
+        }
+        catch (Exception e) {
+            System.out.println("999 Processing error. Error defining word.");
         }
     }
 
@@ -288,10 +305,15 @@ public class CSdict {
                 System.out.println("999 Processing error. Invalid database");
             }
             else {
-                System.out.println("99 Processing error.");
+                System.out.println("999 Processing error.");
             }
-        } catch (Exception e) {
-            System.out.println("99 Processing error.");
+        }
+        catch (SocketException e) {
+            isConnectionOpen = false;
+            System.out.println("925 Control connection I/O error, closing control connection.");
+        }
+        catch (Exception e) {
+            System.out.println("999 Processing error. Error matching word.");
         }
     }
 
@@ -306,8 +328,12 @@ public class CSdict {
                 System.out.println("999 Processing error. Could not close connection.");
             }
         }
+        catch (SocketException e) {
+            isConnectionOpen = false;
+            System.out.println("925 Control connection I/O error, closing control connection.");
+        }
         catch (Exception e) {
-            System.out.println("999 Processing error. " + e.getMessage());
+            System.out.println("999 Processing error. Error closing connection.");
         }
     }
 
