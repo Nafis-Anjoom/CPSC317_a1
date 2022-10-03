@@ -12,9 +12,6 @@ import java.io.IOException;
 import java.net.*;
 import java.util.Arrays;
 import java.io.BufferedReader;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.spi.ResourceBundleControlProvider;
 
 //
 // This is an implementation of a simplified version of a command
@@ -44,7 +41,6 @@ public class CSdict {
         int len;
 
         // Verify command line arguments
-
         if (args.length == PERMITTED_ARGUMENT_COUNT) {
             debugOn = args[0].equals("-d");
             if (debugOn) {
@@ -58,10 +54,6 @@ public class CSdict {
             return;
         }
 
-
-        // Example code to read command line input and extract arguments.
-
-        // Quit flag to exit loop
         Boolean quitFlag = false;
 
         do {
@@ -216,16 +208,23 @@ public class CSdict {
         try {
             String command = "SHOW DB\r\n";
             writeToSocket(command);
-            String response = in.readLine();
-            while (!response.equals(".")) {
-                System.out.println(response);
-                response = in.readLine();
+            Response response = new Response(in);
+            String detailedStatusInfo;
+            if (response.getStatusCode() == Response.SUCCESSFUL_SHOWDB) {
+                String output;
+                while(!(output = in.readLine()).equals(".")) {
+                    System.out.println(output);
+                }
+                System.out.println(".");
+                detailedStatusInfo = in.readLine();
+                if (debugOn) {
+                    System.out.println("<-- " + detailedStatusInfo);
+                }
             }
-            System.out.println(".");
-            String detailedStatusInfo = in.readLine();
-            if (debugOn) {
-                System.out.println("<-- " + detailedStatusInfo);
+            else {
+                System.out.println("****No database present****");
             }
+
         }
         catch (SocketException e) {
             isConnectionOpen = false;

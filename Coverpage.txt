@@ -1,7 +1,7 @@
                  University of British Columbia
                  Department of Computer Science 
                          CPSC 317
-                     Winter 2020, Term 1
+                     Winter 2022, Term 1
 
 
 

@@ -9,6 +9,8 @@ public class Response {
     public static final int DICTIONARY_INFO = 151;
     public static final int OK = 250;
     public static final int SUCCESSFUL_CLOSE = 221;
+    public static final int SUCCESSFUL_SHOWDB = 110;
+    public static final int NO_DATABASE_PRESENT = 554;
     private int statusCode;
     private int numOfMatches = -1;
 
@@ -21,7 +23,7 @@ public class Response {
         }
         String[] codes = initialResponse.split(" ");
         statusCode = Integer.parseInt(codes[0]);
-        if (statusCode == SUCCESSFUL_RETRIEVAL || statusCode == MATCH_FOUND) {
+        if (statusCode == SUCCESSFUL_RETRIEVAL || statusCode == MATCH_FOUND || statusCode == SUCCESSFUL_SHOWDB) {
             numOfMatches = Integer.parseInt(codes[1]);
         }
     }
